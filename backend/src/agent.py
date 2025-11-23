@@ -44,6 +44,7 @@ class Assistant(Agent):
             After the user confirms, you MUST use the `save_order` tool to save the order.
             
             Whenever you receive new information about the order (e.g. user specifies size, or changes milk), you MUST use the `update_order_preview` tool to update the visual display.
+            Call `update_order_preview` immediately when you receive ANY new information, even if other details are missing.
             
             Be conversational, polite, and helpful. Keep your responses concise.""",
         )
@@ -52,11 +53,11 @@ class Assistant(Agent):
     async def update_order_preview(
         self,
         ctx: RunContext,
-        drink_type: str,
-        size: str,
-        milk: str,
-        extras: List[str],
-        name: str,
+        drink_type: str = "",
+        size: str = "",
+        milk: str = "None",
+        extras: List[str] = [],
+        name: str = "Guest",
     ):
         """Update the visual preview of the order. Call this whenever the user provides new details.
 
