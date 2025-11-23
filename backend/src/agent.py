@@ -11,10 +11,13 @@ from livekit.agents import (
     WorkerOptions,
     cli,
     metrics,
+    metrics,
     tokenize,
-    # function_tool,
-    # RunContext
+    function_tool,
+    RunContext
 )
+import json
+from typing import List
 from livekit.plugins import murf, silero, google, deepgram, noise_cancellation
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
@@ -26,11 +29,96 @@ load_dotenv(".env.local")
 class Assistant(Agent):
     def __init__(self) -> None:
         super().__init__(
-            instructions="""You are a helpful voice AI assistant. The user is interacting with you via voice, even if you perceive the conversation as text.
-            You eagerly assist users with their questions by providing information from your extensive knowledge.
-            Your responses are concise, to the point, and without any complex formatting or punctuation including emojis, asterisks, or other symbols.
-            You are curious, friendly, and have a sense of humor.""",
+            instructions="""You are a friendly and efficient barista at a coffee shop.
+            Your goal is to take the customer's order accurately and pleasantly.
+            You must maintain the state of the order, which includes:
+            - Drink Type (e.g., Latte, Cappuccino, Americano)
+            - Size (Small, Medium, Large)
+            - Milk (Whole, Skim, Oat, Almond, Soy, None)
+            - Extras (e.g., Whipped Cream, Extra Shot, Vanilla Syrup, None)
+            - Customer Name
+
+            You should ask clarifying questions to fill in any missing details.
+            For example, if the user asks for a Latte, ask what size and what kind of milk they would like.
+            Once you have all the details (Drink Type, Size, Milk, Extras, Name), you must confirm the order with the user.
+            After the user confirms, you MUST use the `save_order` tool to save the order.
+            
+            Whenever you receive new information about the order (e.g. user specifies size, or changes milk), you MUST use the `update_order_preview` tool to update the visual display.
+            
+            Be conversational, polite, and helpful. Keep your responses concise.""",
         )
+
+    @function_tool
+    async def update_order_preview(
+        self,
+        ctx: RunContext,
+        drink_type: str,
+        size: str,
+        milk: str,
+        extras: List[str],
+        name: str,
+    ):
+        """Update the visual preview of the order. Call this whenever the user provides new details.
+
+        Args:
+            drink_type: The type of drink (e.g., Latte, Cappuccino).
+            size: The size of the drink (Small, Medium, Large).
+            milk: The type of milk (e.g., Whole, Oat, Almond).
+            extras: A list of any extra additions (e.g., Whipped Cream, Extra Shot).
+            name: The customer's name.
+        """
+        logger.info(f"Updating preview for {name}: {size} {drink_type}")
+        
+        order_data = {
+            "drinkType": drink_type,
+            "size": size,
+            "milk": milk,
+            "extras": extras,
+            "name": name,
+        }
+        
+        await ctx.room.local_participant.publish_data(
+            json.dumps(order_data),
+            topic="order_update",
+        )
+        return "Preview updated."
+
+    @function_tool
+    async def save_order(
+        self,
+        ctx: RunContext,
+        drink_type: str,
+        size: str,
+        milk: str,
+        extras: List[str],
+        name: str,
+    ):
+        """Save the completed coffee order to a JSON file.
+
+        Args:
+            drink_type: The type of drink (e.g., Latte, Cappuccino).
+            size: The size of the drink (Small, Medium, Large).
+            milk: The type of milk (e.g., Whole, Oat, Almond).
+            extras: A list of any extra additions (e.g., Whipped Cream, Extra Shot).
+            name: The customer's name.
+        """
+        logger.info(f"Saving order for {name}: {size} {drink_type} with {milk} and {extras}")
+
+        order_data = {
+            "drinkType": drink_type,
+            "size": size,
+            "milk": milk,
+            "extras": extras,
+            "name": name,
+        }
+
+        try:
+            with open("order.json", "w") as f:
+                json.dump(order_data, f, indent=2)
+            return "Order saved successfully! Thank you for your order."
+        except Exception as e:
+            logger.error(f"Failed to save order: {e}")
+            return "I'm sorry, there was an issue saving your order. Please try again."
 
     # To add tools, use the @function_tool decorator.
     # Here's an example that adds a simple weather tool.

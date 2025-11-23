@@ -10,6 +10,7 @@ import {
 
 function transcriptionToChatMessage(textStream: TextStreamData, room: Room): ReceivedChatMessage {
   return {
+    type: 'chatMessage',
     id: textStream.streamInfo.id,
     timestamp: textStream.streamInfo.timestamp,
     message: textStream.text,
@@ -17,8 +18,8 @@ function transcriptionToChatMessage(textStream: TextStreamData, room: Room): Rec
       textStream.participantInfo.identity === room.localParticipant.identity
         ? room.localParticipant
         : Array.from(room.remoteParticipants.values()).find(
-            (p) => p.identity === textStream.participantInfo.identity
-          ),
+          (p) => p.identity === textStream.participantInfo.identity
+        ),
   };
 }
 

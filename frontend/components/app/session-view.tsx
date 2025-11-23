@@ -10,6 +10,9 @@ import {
   AgentControlBar,
   type ControlBarControls,
 } from '@/components/livekit/agent-control-bar/agent-control-bar';
+import { BeverageDisplay } from '@/components/app/beverage-display';
+import { useRoomContext } from '@livekit/components-react';
+import { RemoteParticipant, RoomEvent } from 'livekit-client';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useConnectionTimeout } from '@/hooks/useConnectionTimout';
 import { useDebugMode } from '@/hooks/useDebug';
@@ -36,7 +39,7 @@ const BOTTOM_VIEW_MOTION_PROPS = {
   transition: {
     duration: 0.3,
     delay: 0.5,
-    ease: 'easeOut',
+    ease: 'easeOut' as const,
   },
 };
 
@@ -72,6 +75,28 @@ export const SessionView = ({
   const messages = useChatMessages();
   const [chatOpen, setChatOpen] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  const room = useRoomContext();
+  const [orderState, setOrderState] = useState<any>(null);
+
+  useEffect(() => {
+    const onDataReceived = (payload: Uint8Array, participant?: RemoteParticipant, _kind?: any, topic?: string) => {
+      if (topic === 'order_update') {
+        const strData = new TextDecoder().decode(payload);
+        try {
+          const data = JSON.parse(strData);
+          setOrderState(data);
+        } catch (e) {
+          console.error('Failed to parse order data', e);
+        }
+      }
+    };
+
+    room.on(RoomEvent.DataReceived, onDataReceived);
+    return () => {
+      room.off(RoomEvent.DataReceived, onDataReceived);
+    };
+  }, [room]);
 
   const controls: ControlBarControls = {
     leave: true,
@@ -111,6 +136,13 @@ export const SessionView = ({
 
       {/* Tile Layout */}
       <TileLayout chatOpen={chatOpen} />
+
+      {/* Beverage Display - Floating Top Right */}
+      <div className="absolute top-4 right-4 z-50 w-80 pointer-events-none">
+        <div className="pointer-events-auto">
+          <BeverageDisplay order={orderState} />
+        </div>
+      </div>
 
       {/* Bottom */}
       <MotionBottom
